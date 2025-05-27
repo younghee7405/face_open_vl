@@ -38,7 +38,11 @@ def draw_text_on_image(img_path, text, output_path='static/with_text.jpg'):
     return output_path
 
 def refine_with_gpt(messages: list):
-    prompt = "다음은 얼굴을 분석한 관상 결과야. 자연스럽고 매끄러운 말투로 요약해줘:\n\n"
+    prompt = (
+        "당신은 관상 전문가입니다. 아래 얼굴 특징을 바탕으로 자연스럽고 신뢰감 있는 말투로 관상 분석을 해주세요.\n"
+        "문장은 3~4개로 구성하며, 각각의 특징이 잘 드러나도록 해주세요.\n\n"
+    )
+
     for line in messages:
         prompt += f"- {line}\n"
 
