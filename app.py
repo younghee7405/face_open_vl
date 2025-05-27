@@ -8,7 +8,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
-load_dotenv()  # .env 파일에서 환경변수 불러오기
+load_dotenv()
 
 app = Flask(__name__)
 face_mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1)
@@ -60,6 +60,7 @@ def upload():
     file.save(filepath)
 
     image = cv2.imread(filepath)
+    image = cv2.resize(image, (640, 480))
     h, w, _ = image.shape
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = face_mesh.process(rgb_image)
@@ -68,58 +69,67 @@ def upload():
 
     if results.multi_face_landmarks:
         for landmarks in results.multi_face_landmarks:
-            forehead_y = get_point(landmarks, 10, w, h)[1]
-            nose_y = get_point(landmarks, 1, w, h)[1]
-            left_eye = get_point(landmarks, 33, w, h)
-            right_eye = get_point(landmarks, 263, w, h)
-            eye_gap = abs(right_eye[0] - left_eye[0])
-            eye_width = abs(get_point(landmarks, 133, w, h)[0] - left_eye[0])
-            jaw_width = abs(get_point(landmarks, 234, w, h)[0] - get_point(landmarks, 454, w, h)[0])
-
-            if forehead_y < nose_y - 40:
-                results_text.append("🧠 이마가 높고 넓어 리더십과 판단력이 뛰어납니다.")
-            else:
-                results_text.append("🤔 이마가 낮은 편이라 실용적이고 행동 중심적인 성향입니다.")
-
-            if eye_gap > eye_width * 1.5:
-                results_text.append("👀 눈 사이가 넓어 독립적이고 자기 주장이 강한 편입니다.")
-            else:
-                results_text.append("👀 눈 사이가 적당해 조화로운 대인 관계를 잘 맺습니다.")
-
-            if jaw_width > w * 0.5:
-                results_text.append("💪 턱이 각지고 넓은 편이라 책임감이 강한 성격입니다.")
-            else:
-                results_text.append("😊 턱이 갸름한 편이라 감성적이고 섬세한 성향입니다.")
-
-            left_eye_start = get_point(landmarks, 33, w, h)
-            left_eye_end = get_point(landmarks, 133, w, h)
+            jaw_left = get_point(landmarks, 234, w, h)
+            jaw_right = get_point(landmarks, 454, w, h)
+            chin = get_point(landmarks, 152, w, h)
+            forehead = get_point(landmarks, 10, w, h)
+            nose_tip = get_point(landmarks, 1, w, h)
+            nose_top = get_point(landmarks, 6, w, h)
+            eye_left = get_point(landmarks, 33, w, h)
+            eye_right = get_point(landmarks, 263, w, h)
+            eye_inner_left = get_point(landmarks, 133, w, h)
             mouth_left = get_point(landmarks, 61, w, h)
             mouth_right = get_point(landmarks, 291, w, h)
-            nose_top = get_point(landmarks, 6, w, h)
-            nose_tip = get_point(landmarks, 1, w, h)
 
-            if left_eye_end[1] < left_eye_start[1] - 5:
-                extended_results.append("👁 눈꼬리가 올라가 있어 활발하고 낙천적인 성격입니다.")
-            elif left_eye_end[1] > left_eye_start[1] + 5:
-                extended_results.append("👁 눈꼬리가 내려가 있어 온순하고 차분한 인상입니다.")
-            else:
-                extended_results.append("👁 눈꼬리가 수평으로 균형 잡힌 인상입니다.")
+            def euclidean(p1, p2):
+                return int(((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**0.5)
 
-            if mouth_right[1] < mouth_left[1] - 5:
-                extended_results.append("😊 입꼬리가 올라가 밝고 긍정적인 성향입니다.")
-            elif mouth_right[1] > mouth_left[1] + 5:
-                extended_results.append("😐 입꼬리가 살짝 내려가 조용하고 신중한 스타일입니다.")
-            else:
-                extended_results.append("🙂 입꼬리가 중립적이며 차분한 성격입니다.")
+            jaw_width = euclidean(jaw_left, jaw_right)
+            face_height = euclidean(forehead, chin)
+            eye_gap = abs(eye_left[0] - eye_right[0])
+            nose_length = abs(nose_top[1] - nose_tip[1])
+            mouth_slope = mouth_right[1] - mouth_left[1]
+            eye_slope = eye_inner_left[1] - eye_left[1]
 
-            if nose_top[1] < nose_tip[1] - 20:
-                extended_results.append("👃 콧대가 높아 자존감과 자신감이 강한 성향입니다.")
+            if jaw_width > 270:
+                results_text.append("💪 턱이 넓은 편이라 리더십과 추진력이 강합니다.")
+            elif jaw_width < 220:
+                results_text.append("😊 턱이 갸름해 감수성이 풍부하고 섬세한 성향입니다.")
             else:
-                extended_results.append("👃 콧대가 낮아 겸손하고 조화로운 성격입니다.")
+                results_text.append("🙂 균형 잡힌 턱선으로 조화로운 성격입니다.")
+
+            if face_height > 330:
+                results_text.append("🧠 얼굴이 긴 편으로 사고 중심의 이성적인 스타일입니다.")
+            else:
+                results_text.append("😄 얼굴이 짧은 편으로 행동력과 친근함이 돋보입니다.")
+
+            if eye_gap > 150:
+                results_text.append("👀 눈 사이가 넓어 독립적이고 분석적인 성격입니다.")
+            else:
+                results_text.append("👀 눈 사이가 가까워 감성적이고 사람 중심적인 성향입니다.")
+
+            if nose_length > 40:
+                results_text.append("👃 콧대가 높고 길어 자존감과 자기 통제력이 뛰어납니다.")
+            else:
+                results_text.append("👃 콧대가 짧은 편이라 유연하고 포용력이 강한 스타일입니다.")
+
+            if eye_slope < -5:
+                extended_results.append("👁 눈꼬리가 올라가 활기차고 외향적인 성격입니다.")
+            elif eye_slope > 5:
+                extended_results.append("👁 눈꼬리가 내려가 차분하고 온화한 성향입니다.")
+            else:
+                extended_results.append("👁 눈꼬리가 수평이라 침착하고 균형 잡힌 스타일입니다.")
+
+            if mouth_slope < -5:
+                extended_results.append("😊 입꼬리가 올라가 밝고 긍정적인 사람입니다.")
+            elif mouth_slope > 5:
+                extended_results.append("😐 입꼬리가 내려가 조용하고 신중한 스타일입니다.")
+            else:
+                extended_results.append("🙂 입꼬리가 평평해 차분하고 믿음직한 인상을 줍니다.")
 
     refined_text = refine_with_gpt(results_text + extended_results)
     draw_text_on_image(filepath, refined_text)
     return render_template('index.html', filename='with_text.jpg', final_analysis=refined_text)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
