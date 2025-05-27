@@ -1,0 +1,7 @@
+
+Flask
+opencv-python
+mediapipe
+Pillow
+openai>=1.0.0
+python-dotenv
